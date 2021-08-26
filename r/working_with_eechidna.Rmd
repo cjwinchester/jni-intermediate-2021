@@ -1,0 +1,222 @@
+---
+title: "Querying APIs with eechidna"
+output:
+  html_document:
+    df_print: paged
+---
+
+### Getting started with R using tidyverse and eechidna
+Any time that we're working with R, we have to first install the packages we are working with. You typically will do this once, unless you have recently updated your version of R. You will use the **install.packages()** command for this.
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+#install.packages("tidyverse")
+install.packages("eechidna")
+```
+
+Today we'll work with a package called ***[eechidna](https://github.com/jforbes14/eechidna/)*** (yes, like **[this one](https://www.bushheritage.org.au/species/echidna)** but with an extra letter to make the acronym work) -- Exploring Election and Census Highly Informative Data Nationally for Australia.
+
+Once the package has been installed using the ** install.packages()** function, we can now load it into R for use. Remember, any time you open R, you'll need to load necessary libraries in. Today, we'll use both tidyverse and eechidna. 
+
+```{r message=FALSE}
+library(tidyverse)
+library(eechidna)
+```
+
+Notice the differences above. When I installed a package, I placed quote marks around the package name. That's because R is searching for packages with those names on a repository called [CRAN](https://cran.r-project.org/). Once it is installed on your computer, you don't need quote marks since it lives on your computer.
+
+Thanks to **[some guidance](https://jforbes14.github.io/eechidna/reference/index.html)** from the people who built the eechidna package, we know that data from House of Representatives elections, polling booth data from Federal elections and Census data from all electorates are pre-installed. 
+
+Let's take a quick look at the 2016 Census data to see what is here.
+
+```{r paged.print=TRUE}
+glimpse(abs2016)
+```
+#### Selecting data
+We can see that there's quite a bit of data in here. Given that the past year and a half has seen much of our work move online, including this training, let's take a closer look at Internet access around the country. We won't need all of the other columns, so we'll select just what we might need.
+
+```{r}
+abs2016 %>% # We use this pipe to connect pieces of code together.
+  select(DivisionNm, State, Population, InternetAccess, InternetAccess_NS) %>%
+  head(5) # Going to look at just the first five rows of data.
+```
+The table shows us the us the electoral division name, the State abbrevation, the population of the division, the percentage of people who have Internet access, as well at the percentage of people who did not repsond to the question in the 2016 Census. 
+
+#### Mutating data
+
+Using the tidyverse, we can actually compute an estimated number of people with access to the Internet by using the **mutate** function. 
+
+```{r}
+abs2016 %>% # We use this pipe to connect pieces of code together.
+  select(DivisionNm, State, Population, InternetAccess, InternetAccess_NS) %>%
+  mutate(InternetPopulation = Population * (InternetAccess/100)) %>% # I had to divide the percentage by 100 in order to get a decimal.
+  head(5) # Going to look at just the first five rows of data.
+```
+This now allows me to see that in Adelaide, approximately 137,000 people have access to the Internet. By creating this new number, I can also look at numbers throughout the entire state. This might be available in other Census data, but it's good to know that we can construct this information on our own. 
+
+#### Creating a new data frame
+
+We're going to slightly modify the code from above and store it in a new data frame called **absInternet**
+
+```{r}
+absInternet <- abs2016 %>% # We use the <- to assign the results of our code to a data frame called absInternet
+  select(DivisionNm, State, Population, InternetAccess, InternetAccess_NS) %>%
+  mutate(InternetPopulation = Population * (InternetAccess/100)) # I had to divide the percentage by 100 in order to get a decimal.
+```
+
+#### Filtering data
+
+Now we're able to work with our new data frame. Let's say I only want to return records from South Australia. I can use the **filter** function.
+
+```{r}
+absInternet %>%
+  filter(State == "SA")
+```
+
+We get 11 rows that meet our filter requirement. Now let's say I want to look for data from both South Australia and the Northern Territory. I can do that as well with a little modification to my code. 
+
+```{r}
+absInternet %>%
+  filter(State == "SA" | State == "TAS") # Note my use of the divider | between each.
+```
+I can now see that I have sixteen records from either Tasmania or South Australia. So we've seen what we can do with the **filter** and **select** functions. But, I also want to show you how we can summarize this data by State, so that we can see an overall trend of Internet access. 
+
+#### Summarizing data
+We'll use the **summarize** function. Before we summarize, we'll also need to group our data by State using the **group_by** function.
+
+```{r}
+absInternet %>%
+  group_by(State) %>% # Grouping by the State codes. 
+  summarize(total_population = sum(Population),
+            total_Internet = sum(InternetPopulation)
+  ) 
+```
+
+We get a smaller table with just the State (or territory) code, the total population of that state, and the total estimate of respondents who have Internet access. We can go a little further and estimate the percentage of people with Internet in each state or territory by using **mutate()** on this data.
+
+```{r}
+absInternet %>%
+  group_by(State) %>% # Grouping by the State codes. 
+  summarize(total_population = sum(Population),
+            total_Internet = sum(InternetPopulation)
+  ) %>%
+  mutate(pct_Internet = total_Internet / total_population)
+```
+
+This table is helpful, but it would be nice to see which state or territory has the lowest level of Internet access among residents. We can add the **arrange()** function to our code to help us see this.
+
+```{r}
+absInternet %>%
+  group_by(State) %>% # Grouping by the State codes. 
+  summarize(total_population = sum(Population),
+            total_Internet = sum(InternetPopulation)
+  ) %>%
+  mutate(pct_Internet = total_Internet / total_population) %>%
+  arrange(pct_Internet)
+```
+
+We find that Tasmania has the lowest percent of residents with access to the Internet. Approximately, 78% percent of residents have Internet access. It's a very similar number for those living in the Northern Territory -- 78%. On the other end of the list is the Australian Capital Territory. Nearly nine out of every 10 residents has Internet access.
+
+#### Visualizing data
+
+A table is a great way to get a first look at some data, but maybe a chart of this would be more useful to us? We can do that with R as well. As part of the tidyverse, we have a collection of functions that will allow us to plot our data. For now, we'll continue adding to our previous block of code. That's the best advantage of the tidyverse -- it allows us to put all of our data processes together seamlessly. 
+
+```{r}
+absInternet %>%
+  group_by(State) %>% # Grouping by the State codes. 
+  summarize(total_population = sum(Population),
+            total_Internet = sum(InternetPopulation)
+  ) %>%
+  mutate(pct_Internet = total_Internet / total_population) %>%
+  arrange(pct_Internet) %>% # Next up, ggplot
+  ggplot(aes(State, pct_Internet)) + # A point of order here: to put ggplot objects together, we use a plus sign rather than the %>%
+  geom_col()
+```
+
+This will give us a chart that alphabetizes the state codes across the y-axis, so we'll need to modify our code slightly to order these from low-to-high.
+
+```{r}
+absInternet %>%
+  group_by(State) %>% # Grouping by the State codes. 
+  summarize(total_population = sum(Population),
+            total_Internet = sum(InternetPopulation)
+  ) %>%
+  mutate(pct_Internet = total_Internet / total_population) %>%
+  arrange(pct_Internet) %>% # Next up, ggplot
+  ggplot(aes(reorder(State, pct_Internet), pct_Internet)) + # A point of order here: to put ggplot objects together, we use a plus sign rather than the %>%
+  geom_col()
+```
+
+It's not the best-looking chart. But with a few extra lines of code, we can clean up the axes, provide a title, and make the chart look a little cleaner. 
+
+```{r}
+absInternet %>%
+  group_by(State) %>% # Grouping by the State codes. 
+  summarize(total_population = sum(Population),
+            total_Internet = sum(InternetPopulation)
+  ) %>%
+  mutate(pct_Internet = total_Internet / total_population) %>%
+  arrange(pct_Internet) %>% # Next up, ggplot
+  ggplot(aes(reorder(State, pct_Internet), pct_Internet)) + # A point of order here: to put ggplot objects together, we use a plus sign rather than the %>%
+  geom_col() +
+  xlab("State") + ylab("Percent of respondents with access to the Internet") +
+  labs(title = "What percent of Australians have access to the Internet? (by state or territory)") +
+  coord_flip() +
+  theme_minimal()
+```
+
+If we take a step back, and look at the data before grouping, we can take one quick look at trends throughout the states. For example, what does the percentage of those residents with Internet access look like throughout each state? 
+
+```{r}
+absInternet %>%
+  ggplot(aes(InternetAccess, State,
+             color = State)) +
+  geom_point()
+```
+
+We can see that a division in New South Wales has the lowest share of Internet access. That's Parkes. The highest share of Internet access is found in the division of Ryan in Queensland. Parts of Brisbane are in this division. The color coding is only to make things look a little more appealing, so we can lose the legend.
+
+```{r}
+absInternet %>%
+  ggplot(aes(InternetAccess, State,
+             color = State)) +
+  geom_point() +
+  theme(legend.position = "none") +
+  xlab("Percentage of residents with Internet access, by Electoral Division")
+```
+
+This is just an introductory taste of what we can do with the tidyverse, and ggplot specifically. Check out [this presentation](https://www.cedricscherer.com/slides/OutlierConf2021_ggplot-wizardry.pdf) by Dr. Cédric Scherer to see what exactly is possible with R. 
+
+### Next Steps
+We looked only at Internet access throughout the electoral divisions and states of Australia. But there's so much more we can do. For example, we can compare variables and plot them on a scatterplot.
+
+What is the relationship (or is there one) between Internet access and median household income? We can use our original dataset to find out.
+
+```{r}
+abs2016 %>%
+  ggplot(aes(InternetAccess, MedianHouseholdIncome)) + 
+  geom_point()
+```
+
+There does appear to be a relationship between these two values! You could go as far as color coding it by state to see where they are. 
+
+```{r}
+abs2016 %>%
+  ggplot(aes(InternetAccess, MedianHouseholdIncome)) + 
+  geom_point(aes(colour = factor(State)))
+```
+
+#### Try it on your own!
+Using the **glimpse** function to take a look at the data again, refresh your memory on what fields are in the **abs2016** dataset. Pick one variable, or two, and build a chart that looks at that value across all Electoral Divisions in Australia, or group them by state. 
+
+**A few suggestions**:
+
+- Compare median household income to median rent (both are weekly numbers in the data.)
+- Is there a relationship between the median age of an Electoral Division and the number of people who are married? 
+- Any number of things you can think of! There are nearly 150 variables in this data. 
+
+#### Check out other resources and ideas
+In the [*eechidna* documentation](https://jforbes14.github.io/eechidna/index.html), there are plenty of ideas for looking at the data in addition to information about how to map data. Mappable areas include:
+
+  - States and territories
+  - [Electoral divisions](https://jforbes14.github.io/eechidna/articles/plotting-electorates.html)
+  - [Polling booths](https://jforbes14.github.io/eechidna/articles/plotting-polling-stns.html)
